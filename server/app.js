@@ -36,8 +36,8 @@ const logger = winston.createLogger({
   ),
   defaultMeta: { service: 'procheck-ocr', version: '1.0.0' },
   transports: [
-    new winston.transports.File({ filename: path.join(__dirname, '../logs/error.log'), level: 'error' }),
-    new winston.transports.File({ filename: path.join(__dirname, '../logs/combined.log') }),
+    new winston.transports.File({ filename: path.join(process.cwd(), 'logs/error.log'), level: 'error' }),
+    new winston.transports.File({ filename: path.join(process.cwd(), 'logs/combined.log') }),
     new winston.transports.Console({
       format: winston.format.combine(winston.format.colorize(), winston.format.simple())
     })
@@ -46,15 +46,16 @@ const logger = winston.createLogger({
 
 // Ensure required directories exist
 const ensureDirectories = async () => {
-  const dirs = ['../logs', '../data', '../uploads'];
+  const dirs = ['logs', 'data', 'uploads'];
   for (const dir of dirs) {
     try {
-      await fs.mkdir(path.join(__dirname, dir), { recursive: true });
+      await fs.mkdir(path.join(process.cwd(), dir), { recursive: true });
     } catch (error) {
       logger.error(`Failed to create directory ${dir}:`, error);
     }
   }
 };
+
 
 // Security & middleware setup
 app.use(helmet({
@@ -125,6 +126,19 @@ app.use(express.json({
   verify: (req, res, buf) => { req.rawBody = buf; }
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// --- FIX #1: Correctly serve static files from the root 'public' directory ---
+app.use(express.static(path.join(process.cwd(), 'public'), {
+  maxAge: NODE_ENV === 'production' ? '1y' : '0',
+  etag: true,
+  lastModified: true,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    }
+  }
+}));
+
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -333,25 +347,18 @@ app.get('/api/guests', async (req, res) => {
   }
 });
 
-// Serve static files from public folder
-app.use(express.static(path.join(__dirname, '../public'), {
-  maxAge: NODE_ENV === 'production' ? '1y' : '0',
-  etag: true,
-  lastModified: true,
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.js')) {
-      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-    }
-  }
-}));
 
-// SPA fallback: serve index.html for non-API routes
-app.get('/', (req, res) => {
-  res.status(200).json({ 
-    success: true, 
-    message: 'ProCheck OCR API is running' 
-  });
+// --- FIX #2: Restore the SPA fallback to serve index.html for non-API, non-file routes ---
+// This should come AFTER all your API routes but BEFORE your 404 handler.
+app.get('*', (req, res, next) => {
+    // If the request is not for an API route, serve the index.html file.
+    if (!req.originalUrl.startsWith('/api')) {
+        return res.sendFile(path.join(process.cwd(), 'public/index.html'));
+    }
+    // If it is an API route, pass it to the next handler (the 404 handler in this case)
+    next();
 });
+
 
 // Error handler middleware
 app.use((error, req, res, next) => {
@@ -365,11 +372,12 @@ app.use((error, req, res, next) => {
 });
 
 // 404 handler
-app.use('*', (req, res) => {
-  logger.warn('404 - Route not found', { url: req.originalUrl, method: req.method, ip: req.ip });
+app.use((req, res, next) => {
+  // This will now correctly catch API routes that don't exist
+  logger.warn('404 - API route not found', { url: req.originalUrl, method: req.method, ip: req.ip });
   res.status(404).json({
     success: false,
-    message: 'Endpoint not found',
+    message: 'API endpoint not found',
     path: req.originalUrl,
     method: req.method,
     timestamp: new Date().toISOString()
@@ -424,7 +432,6 @@ const startServer = async () => {
       logger.info(`📍 Server running on: http://localhost:${PORT}`);
       logger.info(`🔧 Environment: ${NODE_ENV}`);
       logger.info(`💚 Health Check: http://localhost:${PORT}/api/health`);
-      logger.info(`📊 API Docs: http://localhost:${PORT}/api/guests`);
     });
     module.exports.server = server;
   } catch (error) {
