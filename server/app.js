@@ -143,7 +143,7 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // --- FIX #1: Correctly serve static files from the root 'public' directory ---
-app.use(express.static(path.join(process.cwd(), 'public'), {
+app.use(express.static(path.join(process.cwd(), '..', 'public'), {
   maxAge: NODE_ENV === 'production' ? '1y' : '0',
   etag: true,
   lastModified: true,
@@ -368,8 +368,8 @@ app.get('/api/guests', async (req, res) => {
 app.get('*', (req, res, next) => {
     // If the request is not for an API route, serve the index.html file.
     if (!req.originalUrl.startsWith('/api')) {
-        return res.sendFile(path.join(process.cwd(), 'public/index.html'));
-    }
+    return res.sendFile(path.join(process.cwd(), '..', 'public/index.html'));
+}
     // If it is an API route, pass it to the next handler (the 404 handler in this case)
     next();
 });
