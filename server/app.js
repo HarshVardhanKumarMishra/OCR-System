@@ -1,3 +1,18 @@
+// --- TEMPORARY DEBUGGING ---
+const fs_debug = require('fs');
+const path_debug = require('path');
+console.log('--- STARTING DEBUG INFO ---');
+console.log('Current Working Directory (process.cwd()):', process.cwd());
+console.log('Script Directory (__dirname):', __dirname);
+try {
+    const projectRootContents = fs_debug.readdirSync(process.cwd());
+    console.log('Contents of CWD:', projectRootContents);
+} catch (e) {
+    console.error('Error reading CWD:', e.message);
+}
+console.log('--- ENDING DEBUG INFO ---');
+// --- END TEMPORARY DEBUGGING ---
+
 // Declare server variable in module scope for graceful shutdown and export
 console.log('--- Express is running! ---');
 
