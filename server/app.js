@@ -346,8 +346,11 @@ app.use(express.static(path.join(__dirname, '../public'), {
 }));
 
 // SPA fallback: serve index.html for non-API routes
-app.get(/^\/(?!api).*/, (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    success: true, 
+    message: 'ProCheck OCR API is running' 
+  });
 });
 
 // Error handler middleware
